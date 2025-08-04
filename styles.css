@@ -100,7 +100,7 @@
     position: absolute;
     top: -20px;
     right: -30px;
-    background: #111111;
+    background: #4285f4;
     color: #fff;
     font-size: 1rem;
     padding: 5px 10px;
@@ -119,6 +119,10 @@
 
 .android-icon {
     font-size: 1.4rem;
+}
+
+.android-badge .android-icon::before {
+    content: "🌐";
 }
 
 .title-buttons {
@@ -333,7 +337,7 @@ h1::after, h2::after {
     position: absolute;
     top: -15px;
     right: -50px;
-    background: linear-gradient(135deg, #a4c639 0%, #8BC34A 100%);
+    background: linear-gradient(135deg, #4285f4 0%, #34a853 100%);
     color: #fff;
     font-size: 0.9rem;
     padding: 4px 10px;
@@ -348,12 +352,12 @@ h1::after, h2::after {
 }
 
 .android-edition-tag::before {
-    content: "🤖";
+    content: "🌐";
     margin-right: 4px;
 }
 
 .android-edition-tag::after {
-    content: "📱";
+    content: "💻";
     margin-left: 4px;
 }
 
@@ -2101,7 +2105,7 @@ h2 {
 }
 
 .history-meme {
-    background: linear-gradient(135deg, rgba(255, 204, 0, 0.2) 0%, rgba(255, 107, 107, 0.2) 100%);
+    background: linear-gradient(135deg, rgba(255, 204, 0, 0.2) 0%, rgba(164, 198, 57, 0.2) 100%);
     padding: 12px;
     margin: 10px 0;
     border-radius: 10px;

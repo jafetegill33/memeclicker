@@ -24,7 +24,7 @@ let gameState = {
     clickedDuringBoost: false,
     clicksWithoutBuying: 0,
     buildingClickBonus: 0, // Added to track click power bonus from buildings
-    platform: 'android', // Added platform identifier
+    platform: 'browser', // Changed from 'android' to 'browser'
     hasSeenTitleScreen: false, // Track if user has seen title screen
     // Prestige system values
     heavenlyMemes: 0,
@@ -577,6 +577,7 @@ const achievementStats = document.getElementById('achievement-stats');
 function init() {
     loadGame();
     
+    // Ensure all required properties exist after loading
     if (!gameState.boostActivations) gameState.boostActivations = 0;
     if (!gameState.minigamesPlayed) gameState.minigamesPlayed = 0;
     if (!gameState.minigamesTypes) gameState.minigamesTypes = new Set();
@@ -598,7 +599,7 @@ function init() {
     if (gameState.notificationsEnabled === undefined) gameState.notificationsEnabled = true;
     if (!gameState.buildingMemesProduced) gameState.buildingMemesProduced = {};
     
-    // Initialize building memes produced
+    // Initialize building memes produced for any missing buildings
     generators.forEach(gen => {
         if (!gameState.buildingMemesProduced[gen.id]) {
             gameState.buildingMemesProduced[gen.id] = 0;
@@ -613,10 +614,10 @@ function init() {
         titleScreen.classList.add('active');
         document.body.style.overflow = 'hidden';
         
-        // Update game version for remastered edition
+        // Update game version for browser edition
         const gameVersionElement = document.querySelector('.game-version');
         if (gameVersionElement) {
-            gameVersionElement.textContent = `v2.0 Remastered - Tap to make memes!`;
+            gameVersionElement.textContent = `v2.0 Browser Edition - Tap to make memes!`;
         }
     } else if (returningToGame) {
         showReturnLoadingScreen();
@@ -776,20 +777,35 @@ function init() {
     }
     
     startGameLoop();
+    
+    // Set up autosave interval - save every 10 seconds
     setInterval(() => {
         saveGame();
-    }, 30000); 
+    }, 10000);
     
-    setInterval(checkAchievements, 5000); 
+    // Set up achievement check interval
+    setInterval(checkAchievements, 5000);
+    
+    // Save game when page is about to be closed/refreshed
+    window.addEventListener('beforeunload', () => {
+        saveGame();
+    });
+    
+    // Save game when page becomes hidden (mobile/tab switching)
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            saveGame();
+        }
+    });
     
     // Add vibration setting to settings tab
     const settingsBox = document.createElement('div');
     settingsBox.className = 'settings-box';
     settingsBox.innerHTML = `
-        <h3>Device Settings</h3>
-        <p>Control haptic feedback and other device features.</p>
+        <h3>Browser Settings</h3>
+        <p>Control haptic feedback and other browser features.</p>
         <div class="setting-option">
-            <label for="vibration-toggle">Vibration:</label>
+            <label for="vibration-toggle">Vibration (if supported):</label>
             <label class="switch">
                 <input type="checkbox" id="vibration-toggle" ${gameState.vibrationEnabled ? 'checked' : ''}>
                 <span class="slider round"></span>
@@ -803,13 +819,14 @@ function init() {
             </label>
         </div>
         <div class="setting-option">
-            <label for="notifications-toggle">Notifications:</label>
+            <label for="notifications-toggle">Notifications (if supported):</label>
             <label class="switch">
                 <input type="checkbox" id="notifications-toggle" ${gameState.notificationsEnabled ? 'checked' : ''}>
                 <span class="slider round"></span>
             </label>
         </div>
         <p class="setting-description">Smooth Mode reduces animations and optimizes performance.</p>
+        <p class="setting-description">Some features may not be available in all browsers.</p>
     `;
     document.querySelector('.settings-container').appendChild(settingsBox);
     
@@ -841,26 +858,20 @@ function init() {
         saveGame();
         
         if (gameState.notificationsEnabled) {
-            if (window.cordova && window.cordova.plugins && window.cordova.plugins.notification && window.cordova.plugins.notification.local) {
-                window.cordova.plugins.notification.local.requestPermission(function (granted) {
-                    if (granted) {
+            // Use browser notification API instead of Cordova
+            if ('Notification' in window) {
+                Notification.requestPermission().then(function (permission) {
+                    if (permission === 'granted') {
                         scheduleNotifications();
                         showAchievementPopup('Notifications enabled! Expect daily meme updates!');
                     }
                 });
             }
-        } else {
-            if (window.cordova && window.cordova.plugins && window.cordova.plugins.notification && window.cordova.plugins.notification.local) {
-                window.cordova.plugins.notification.local.cancelAll();
-            }
         }
     });
     
-    // Notification setup (if Cordova is available)
+    // Browser notification setup
     setupNotifications();
-    
-    // Initialize Cordova
-    document.addEventListener('deviceready', onDeviceReady, false);
     
     // Add encyclopedia button to mobile navigation
     const settingsBoxMobile = document.querySelector('.settings-box:nth-child(2)');
@@ -878,39 +889,13 @@ function init() {
     }
 }
 
-// Cordova device ready event handler
-function onDeviceReady() {
-    console.log('Cordova initialized. Device ready.');
-    // Vibrate once to indicate app has loaded
-    vibrate(100);
-    
-    // Initialize notifications if plugin is available
-    if (window.cordova && window.cordova.plugins && window.cordova.plugins.notification && window.cordova.plugins.notification.local) {
-        // Set up permission request
-        document.addEventListener('deviceready', function() {
-            window.cordova.plugins.notification.local.requestPermission(function (granted) {
-                if (granted) {
-                    scheduleNotifications();
-                    console.log("Notifications permission granted and scheduled");
-                } else {
-                    console.log("Notifications permission denied");
-                }
-            });
-        }, false);
-    }
-}
-
-// Vibration utility function
+// Browser-compatible vibration utility function
 function vibrate(duration) {
     if (!gameState.vibrationEnabled) return;
     
-    // Only vibrate if cordova and the plugin are available
-    if (window.navigator && window.navigator.vibrate) {
-        // For browsers that support navigator.vibrate
-        window.navigator.vibrate(duration);
-    } else if (window.cordova && window.cordova.plugins && window.cordova.plugins.notification && window.cordova.plugins.notification.vibration) {
-        // For Cordova vibration plugin
-        window.cordova.plugins.notification.vibration.vibrate(duration);
+    // Use browser vibration API if available
+    if ('vibrate' in navigator) {
+        navigator.vibrate(duration);
     }
 }
 
@@ -1952,21 +1937,8 @@ function performAscension() {
         vibrationEnabled: preservedState.vibrationEnabled,
         smoothMode: preservedState.smoothMode,
         notificationsEnabled: preservedState.notificationsEnabled,
-        buildingMemesProduced: {},
-        lastFrameTime: 0,
-        fpsUpdateInterval: 1000,
-        lastFpsUpdate: 0,
-        frameCount: 0,
-        fps: 60,
-        targetFps: preservedState.smoothMode ? 20 : 30,
-        frameInterval: preservedState.smoothMode ? 1000/20 : 1000/30,
-        lastMpsUpdate: 0
+        buildingMemesProduced: {}
     };
-    
-    // Reset all generators
-    generators.forEach(generator => {
-        generator.amount = 0;
-    });
     
     // Initialize building memes produced after ascension
     generators.forEach(gen => {
@@ -2035,12 +2007,16 @@ function saveGame() {
         vibrationEnabled: gameState.vibrationEnabled,
         smoothMode: gameState.smoothMode,
         notificationsEnabled: gameState.notificationsEnabled,
-        buildingMemesProduced: gameState.buildingMemesProduced
+        buildingMemesProduced: gameState.buildingMemesProduced,
+        lastSaved: Date.now() // Add timestamp for offline progress
     };
     
-    localStorage.setItem('memeClickerSave', JSON.stringify(saveData));
-    
-    showAutosaveIndicator();
+    try {
+        localStorage.setItem('memeClickerSave', JSON.stringify(saveData));
+        showAutosaveIndicator();
+    } catch (error) {
+        console.error('Error saving game:', error);
+    }
 }
 
 // Show autosave indicator function
@@ -2085,7 +2061,7 @@ function resetGame() {
         clickedDuringBoost: false,
         clicksWithoutBuying: 0,
         buildingClickBonus: 0,
-        platform: 'android',
+        platform: 'browser',
         hasSeenTitleScreen: false,
         heavenlyMemes: 0,
         ascensions: 0,
@@ -2304,24 +2280,24 @@ function applyPerformanceMode() {
     }
 }
 
-// Setup notifications function
+// Browser-compatible setup notifications function
 function setupNotifications() {
-    if (window.cordova && window.cordova.plugins && window.cordova.plugins.notification && window.cordova.plugins.notification.local) {
-        // Set up permission request
-        document.addEventListener('deviceready', function() {
-            window.cordova.plugins.notification.local.requestPermission(function (granted) {
-                if (granted) {
-                    scheduleNotifications();
-                }
-            });
-        }, false);
+    // Use browser Notification API instead of Cordova
+    if ('Notification' in window && gameState.notificationsEnabled) {
+        Notification.requestPermission().then(function (permission) {
+            if (permission === 'granted') {
+                scheduleNotifications();
+            }
+        });
     }
 }
 
-// Schedule daily meme notifications
+// Browser-compatible schedule notifications
 function scheduleNotifications() {
-    // Cancel existing notifications first
-    window.cordova.plugins.notification.local.cancelAll();
+    // Use browser notification API
+    if (!('Notification' in window) || Notification.permission !== 'granted') {
+        return;
+    }
     
     // Funny notification titles and messages
     const memeNotifications = [
@@ -2336,34 +2312,45 @@ function scheduleNotifications() {
         { title: "Daily Meme: Jafet Was Here", text: "And now he's wondering where YOU are!" }
     ];
     
-    // Schedule notifications for the next 14 days, one per day
-    const now = new Date();
-    for (let i = 0; i < 14; i++) {
-        const notificationTime = new Date();
-        notificationTime.setDate(now.getDate() + i + 1); // Start from tomorrow
-        notificationTime.setHours(18, 0, 0, 0); // 6:00 PM
-        
-        // Get a random notification
-        const notification = memeNotifications[Math.floor(Math.random() * memeNotifications.length)];
-        
-        // Schedule the notification
-        window.cordova.plugins.notification.local.schedule({
-            id: i + 1,
-            title: notification.title,
-            text: notification.text,
-            foreground: false,
-            trigger: { at: notificationTime }
-        });
+    // Schedule a reminder notification for later (browsers don't support scheduled notifications like mobile)
+    // Instead, we'll use localStorage to track when to show notifications
+    const lastNotification = localStorage.getItem('memeClickerLastNotification');
+    const now = Date.now();
+    const oneDayMs = 24 * 60 * 60 * 1000;
+    
+    if (!lastNotification || (now - parseInt(lastNotification)) > oneDayMs) {
+        // Set a timeout for showing notification after 30 minutes of inactivity
+        setTimeout(() => {
+            if (document.hidden) {
+                const notification = memeNotifications[Math.floor(Math.random() * memeNotifications.length)];
+                new Notification(notification.title, {
+                    body: notification.text,
+                    icon: '/favicon.ico' // Add favicon if available
+                });
+                localStorage.setItem('memeClickerLastNotification', now.toString());
+            }
+        }, 30 * 60 * 1000); // 30 minutes
     }
     
-    // Also add a background notification when idle for too long (24 hours)
-    const lastActiveTimestamp = Date.now();
-    localStorage.setItem('memeClickerLastActive', lastActiveTimestamp);
-    
-    // Set up automatic re-scheduling when reopening the app
-    document.addEventListener('resume', function() {
-        scheduleNotifications();
-    }, false);
+    // Set up visibility change listener for re-engagement notifications
+    document.addEventListener('visibilitychange', function() {
+        if (!document.hidden) {
+            // User returned to tab
+            const lastActive = localStorage.getItem('memeClickerLastActive');
+            if (lastActive) {
+                const timeSinceActive = now - parseInt(lastActive);
+                if (timeSinceActive > 60 * 60 * 1000) { // More than 1 hour
+                    // Show welcome back notification
+                    setTimeout(() => {
+                        showAchievementPopup('Welcome back! Your memes missed you!');
+                    }, 1000);
+                }
+            }
+        } else {
+            // User left tab
+            localStorage.setItem('memeClickerLastActive', Date.now().toString());
+        }
+    });
 }
 
 // Load game from localStorage
@@ -2402,29 +2389,45 @@ function loadGame() {
             gameState.buildingMemesProduced = parsedData.buildingMemesProduced || {};
             
             // Update generators based on saved data
-            parsedData.generators?.forEach(savedGenerator => {
-                const generator = generators.find(g => g.id === savedGenerator.id);
-                if (generator) {
-                    generator.amount = savedGenerator.amount || 0;
-                }
-            });
+            if (parsedData.generators && Array.isArray(parsedData.generators)) {
+                parsedData.generators.forEach(savedGenerator => {
+                    const generator = generators.find(g => g.id === savedGenerator.id);
+                    if (generator) {
+                        generator.amount = savedGenerator.amount || 0;
+                    }
+                });
+            }
+            
+            // Recalculate memes per second after loading
+            recalculateMemesPerSecond();
             
             // Calculate offline progress
-            if (parsedData.lastSaved) {
+            if (parsedData.lastSaved && gameState.memesPerSecond > 0) {
                 const offlineTime = Date.now() - parsedData.lastSaved;
-                if (offlineTime > 5000) { // Only process if at least 5 seconds passed
-                    const offlineHours = offlineTime / 1000 / 60 / 60; // Convert ms to hours
-                    const offlineProductionMultiplier = Math.min(12, offlineHours); // Cap at 12 hours
-                    const offlineProduction = gameState.memesPerSecond * offlineProductionMultiplier * 3600; // hours * seconds per hour
+                if (offlineTime > 10000) { // Only process if at least 10 seconds passed
+                    const offlineSeconds = Math.min(offlineTime / 1000, 43200); // Cap at 12 hours
+                    const heavenlyBonus = 1 + (gameState.heavenlyMemes * 0.1);
+                    const offlineProduction = gameState.memesPerSecond * heavenlyBonus * offlineSeconds;
                     
                     if (offlineProduction > 0) {
                         gameState.memes += offlineProduction;
                         gameState.totalMemes += offlineProduction;
                         gameState.generatedMemes += offlineProduction;
                         
+                        // Update building production tracking
+                        generators.forEach(generator => {
+                            if (generator.amount > 0) {
+                                const buildingContribution = generator.output * heavenlyBonus * generator.amount * offlineSeconds;
+                                if (!gameState.buildingMemesProduced[generator.id]) {
+                                    gameState.buildingMemesProduced[generator.id] = 0;
+                                }
+                                gameState.buildingMemesProduced[generator.id] += buildingContribution;
+                            }
+                        });
+                        
                         // Show offline progress popup after a short delay
                         setTimeout(() => {
-                            showOfflineProgressPopup(offlineHours, offlineProduction);
+                            showOfflineProgressPopup(offlineSeconds / 3600, offlineProduction);
                         }, 1500);
                     }
                 }
@@ -2433,8 +2436,67 @@ function loadGame() {
             console.log('Game loaded successfully!');
         } catch (error) {
             console.error('Error loading game:', error);
+            // Initialize with default values if load fails
+            initializeDefaultGameState();
         }
+    } else {
+        // No save data found, initialize with defaults
+        initializeDefaultGameState();
     }
+}
+
+// Initialize default game state
+function initializeDefaultGameState() {
+    gameState = {
+        memes: 0,
+        memesPerClick: 1,
+        memesPerSecond: 0,
+        totalMemes: 0,
+        clickedMemes: 0,
+        generatedMemes: 0,
+        achievements: {},
+        gameStartTime: Date.now(),
+        lastSaveTime: Date.now(),
+        boostActive: false,
+        boostEndTime: 0,
+        boostMultiplier: 2,
+        boostDuration: 30,
+        boostCooldown: false,
+        totalBuildings: 0,
+        boostActivations: 0,
+        minigamesPlayed: 0,
+        minigamesTypes: new Set(),
+        memoryGamesWon: 0,
+        highestReactionScore: 0,
+        perfectTriviaGames: 0,
+        clickedDuringBoost: false,
+        clicksWithoutBuying: 0,
+        buildingClickBonus: 0,
+        platform: 'browser',
+        hasSeenTitleScreen: false,
+        heavenlyMemes: 0,
+        ascensions: 0,
+        lastAscensionTime: 0,
+        lastFrameTime: 0,
+        fpsUpdateInterval: 1000,
+        lastFpsUpdate: 0,
+        frameCount: 0,
+        fps: 60,
+        targetFps: 30,
+        frameInterval: 1000 / 30,
+        lastMpsUpdate: 0,
+        vibrationEnabled: true,
+        smoothMode: false,
+        notificationsEnabled: true,
+        buildingMemesProduced: {}
+    };
+    
+    // Initialize building memes produced
+    generators.forEach(gen => {
+        if (!gameState.buildingMemesProduced[gen.id]) {
+            gameState.buildingMemesProduced[gen.id] = 0;
+        }
+    });
 }
 
 // Function to show offline progress popup
@@ -2483,5 +2545,5 @@ function showOfflineProgressPopup(hours, memes) {
     });
 }
 
-// Initialize game when DOM is loaded
+// Initialize the game when DOM is loaded
 document.addEventListener('DOMContentLoaded', init);
