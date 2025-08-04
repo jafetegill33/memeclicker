@@ -858,14 +858,26 @@ function init() {
         saveGame();
         
         if (gameState.notificationsEnabled) {
-            // Use browser notification API instead of Cordova
+            // Request permission inside user event handler
             if ('Notification' in window) {
                 Notification.requestPermission().then(function (permission) {
                     if (permission === 'granted') {
                         scheduleNotifications();
                         showAchievementPopup('Notifications enabled! Expect daily meme updates!');
+                    } else if (permission === 'denied') {
+                        showAchievementPopup('Notifications permission denied. You can enable them in browser settings.');
+                        // Reset the toggle if permission was denied
+                        e.target.checked = false;
+                        gameState.notificationsEnabled = false;
+                        saveGame();
                     }
                 });
+            } else {
+                showAchievementPopup('Notifications not supported in this browser.');
+                // Reset the toggle if not supported
+                e.target.checked = false;
+                gameState.notificationsEnabled = false;
+                saveGame();
             }
         }
     });
@@ -2282,13 +2294,10 @@ function applyPerformanceMode() {
 
 // Browser-compatible setup notifications function
 function setupNotifications() {
-    // Use browser Notification API instead of Cordova
-    if ('Notification' in window && gameState.notificationsEnabled) {
-        Notification.requestPermission().then(function (permission) {
-            if (permission === 'granted') {
-                scheduleNotifications();
-            }
-        });
+    // Remove automatic permission request - only request when user toggles setting
+    // Just check if notifications are already granted and schedule if so
+    if ('Notification' in window && Notification.permission === 'granted' && gameState.notificationsEnabled) {
+        scheduleNotifications();
     }
 }
 
